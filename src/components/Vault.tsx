@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
@@ -14,6 +14,7 @@ import {
   Gamepad2,
   Folder,
   Filter,
+  Upload,
 } from "lucide-react";
 import { useVault } from "../context/VaultContext";
 import { CredentialCard } from "./CredentialCard";
@@ -37,7 +38,7 @@ const categoryFilters: {
 ];
 
 export function Vault() {
-  const { credentials, lock } = useVault();
+  const { credentials, lock, addCredential } = useVault();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<Category | "all">("all");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
@@ -45,6 +46,81 @@ export function Vault() {
   const [editingCredential, setEditingCredential] = useState<Credential | null>(
     null,
   );
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const parseCSVRow = (rowText: string): string[] => {
+    const result: string[] = [];
+    let current = "";
+    let inQuotes = false;
+    for (let i = 0; i < rowText.length; i++) {
+      const char = rowText[i];
+      if (char === '"') {
+        if (inQuotes && rowText[i + 1] === '"') {
+          current += '"';
+          i++; // skip next quote
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        result.push(current);
+        current = "";
+      } else {
+        current += char;
+      }
+    }
+    result.push(current);
+    return result;
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const text = event.target?.result as string;
+      if (!text) return;
+
+      const lines = text.split(/\r?\n/).filter(line => line.trim() !== "");
+      if (lines.length <= 1) return; // No data or only header
+
+      const headerRow = parseCSVRow(lines[0]);
+      const nameIdx = headerRow.findIndex(h => h.trim().toLowerCase() === "name");
+      const urlIdx = headerRow.findIndex(h => h.trim().toLowerCase() === "url");
+      const usernameIdx = headerRow.findIndex(h => h.trim().toLowerCase() === "username");
+      const passwordIdx = headerRow.findIndex(h => h.trim().toLowerCase() === "password");
+      const noteIdx = headerRow.findIndex(h => h.trim().toLowerCase() === "note");
+
+      // Skip the header line (index 0)
+      for (let i = 1; i < lines.length; i++) {
+        const row = parseCSVRow(lines[i]);
+        const name = nameIdx !== -1 && row[nameIdx] !== undefined ? row[nameIdx] : "";
+        const url = urlIdx !== -1 && row[urlIdx] !== undefined ? row[urlIdx] : "";
+        const username = usernameIdx !== -1 && row[usernameIdx] !== undefined ? row[usernameIdx] : "";
+        const password = passwordIdx !== -1 && row[passwordIdx] !== undefined ? row[passwordIdx] : "";
+        const note = noteIdx !== -1 && row[noteIdx] !== undefined ? row[noteIdx] : "";
+
+        // Skip rows that don't have basic details
+        if (!name && !username && !password) continue;
+
+        await addCredential({
+          title: name || "Imported Credential",
+          username: username || "",
+          password: password || "",
+          website: url || undefined,
+          notes: note || undefined,
+          category: "other",
+        });
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
 
   const filteredCredentials = useMemo(() => {
     return credentials.filter((cred) => {
@@ -190,6 +266,22 @@ export function Vault() {
                   <List className="h-4 w-4" />
                 </button>
               </div>
+
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept=".csv"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+
+              <button
+                onClick={handleImportClick}
+                className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/50 px-4 py-3 text-sm font-semibold text-slate-300 hover:bg-slate-800 hover:text-white hover:scale-105 transition-all cursor-pointer"
+              >
+                <Upload className="h-5 w-5" />
+                Import from Chrome
+              </button>
 
               <button
                 onClick={() => setIsAddModalOpen(true)}
