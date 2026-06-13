@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
@@ -15,6 +15,7 @@ import {
   Folder,
   Filter,
   Upload,
+  ChevronDown,
 } from "lucide-react";
 import { useVault } from "../context/VaultContext";
 import { CredentialCard } from "./CredentialCard";
@@ -40,12 +41,28 @@ const categoryFilters: {
 export function Vault() {
   const { credentials, lock, addCredential } = useVault();
   const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<Category | "all">("all");
+  const [selectedCategories, setSelectedCategories] = useState<Category[]>(
+    categoryFilters.filter(f => f.value !== "all").map(f => f.value as Category)
+  );
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingCredential, setEditingCredential] = useState<Credential | null>(
     null,
   );
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -129,12 +146,11 @@ export function Vault() {
         cred.username.toLowerCase().includes(search.toLowerCase()) ||
         (cred.website?.toLowerCase().includes(search.toLowerCase()) ?? false);
 
-      const matchesCategory =
-        categoryFilter === "all" || cred.category === categoryFilter;
+      const matchesCategory = selectedCategories.includes(cred.category);
 
       return matchesSearch && matchesCategory;
     });
-  }, [credentials, search, categoryFilter]);
+  }, [credentials, search, selectedCategories]);
 
   const stats = useMemo(() => {
     const byCategory = credentials.reduce(
@@ -211,8 +227,8 @@ export function Vault() {
           </div>
 
           {/* Search & Filters */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
-            {/* Search */}
+          <div className="flex flex-col lg:flex-row gap-4 mb-6">
+            {/* Search - takes most space */}
             <div className="relative flex-1">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500" />
               <input
@@ -224,28 +240,97 @@ export function Vault() {
               />
             </div>
 
-            {/* Category Filter */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0">
-              {categoryFilters.map((filter) => (
+            {/* Filters & Actions */}
+            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+              {/* Category Dropdown */}
+              <div className="relative" ref={dropdownRef}>
                 <button
-                  key={filter.value}
-                  onClick={() => setCategoryFilter(filter.value)}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
-                    categoryFilter === filter.value
-                      ? "bg-gradient-to-r from-cyan-500 to-emerald-500 text-white shadow-lg shadow-cyan-500/20"
-                      : "border border-slate-800 bg-slate-900/50 text-slate-400 hover:bg-slate-800 hover:text-white"
-                  }`}
+                  type="button"
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium border border-slate-800 bg-slate-900/50 text-slate-300 hover:bg-slate-800 hover:text-white transition-all whitespace-nowrap cursor-pointer"
                 >
-                  <filter.icon className="h-4 w-4" />
-                  {filter.label}
+                  <Filter className="h-4 w-4 text-slate-400" />
+                  <span>Category ({selectedCategories.length})</span>
+                  <ChevronDown
+                    className={`h-4 w-4 text-slate-500 transition-transform duration-200 ${
+                      isDropdownOpen ? "rotate-180" : ""
+                    }`}
+                  />
                 </button>
-              ))}
-            </div>
 
-            {/* View Toggle & Add */}
-            <div className="flex items-center gap-2">
+                <AnimatePresence>
+                  {isDropdownOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      className="absolute right-0 mt-2 w-56 rounded-xl border border-slate-800 bg-slate-900 shadow-2xl p-2 z-30 space-y-1 backdrop-blur-xl"
+                    >
+                      <div className="px-2 py-1.5 border-b border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSelectedCategories(
+                              categoryFilters
+                                .filter((f) => f.value !== "all")
+                                .map((f) => f.value as Category),
+                            )
+                          }
+                          className="hover:text-white transition-colors cursor-pointer"
+                        >
+                          Select All
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCategories([])}
+                          className="hover:text-white transition-colors cursor-pointer"
+                        >
+                          Clear
+                        </button>
+                      </div>
+
+                      {categoryFilters
+                        .filter((f) => f.value !== "all")
+                        .map((filter) => {
+                          const isChecked = selectedCategories.includes(
+                            filter.value as Category,
+                          );
+                          return (
+                            <label
+                              key={filter.value}
+                              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-slate-800 hover:text-white cursor-pointer transition-colors"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {
+                                  if (isChecked) {
+                                    setSelectedCategories((prev) =>
+                                      prev.filter((c) => c !== filter.value),
+                                    );
+                                  } else {
+                                    setSelectedCategories((prev) => [
+                                      ...prev,
+                                      filter.value as Category,
+                                    ]);
+                                  }
+                                }}
+                                className="rounded border-slate-700 bg-slate-800 text-cyan-500 focus:ring-cyan-500/20 h-4 w-4"
+                              />
+                              <filter.icon className="h-4 w-4 text-slate-400" />
+                              <span>{filter.label}</span>
+                            </label>
+                          );
+                        })}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* View Toggle */}
               <div className="flex rounded-xl border border-slate-800 bg-slate-900/50 p-1">
                 <button
+                  type="button"
                   onClick={() => setViewMode("grid")}
                   className={`rounded-lg p-2 transition-colors ${
                     viewMode === "grid"
@@ -256,6 +341,7 @@ export function Vault() {
                   <Grid className="h-4 w-4" />
                 </button>
                 <button
+                  type="button"
                   onClick={() => setViewMode("list")}
                   className={`rounded-lg p-2 transition-colors ${
                     viewMode === "list"
@@ -267,6 +353,7 @@ export function Vault() {
                 </button>
               </div>
 
+              {/* CSV Input & Buttons */}
               <input
                 type="file"
                 ref={fileInputRef}
@@ -276,6 +363,7 @@ export function Vault() {
               />
 
               <button
+                type="button"
                 onClick={handleImportClick}
                 className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/50 px-4 py-3 text-sm font-semibold text-slate-300 hover:bg-slate-800 hover:text-white hover:scale-105 transition-all cursor-pointer"
               >
@@ -284,8 +372,9 @@ export function Vault() {
               </button>
 
               <button
+                type="button"
                 onClick={() => setIsAddModalOpen(true)}
-                className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 hover:scale-105 transition-all"
+                className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 hover:scale-105 transition-all cursor-pointer"
               >
                 <Plus className="h-5 w-5" />
                 Add New
