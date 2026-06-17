@@ -1,6 +1,11 @@
 import mongoose from 'mongoose';
 
 const CredentialSchema = new mongoose.Schema({
+  vaultId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Vault',
+    required: true,
+  },
   id: {
     type: String,
     required: true,

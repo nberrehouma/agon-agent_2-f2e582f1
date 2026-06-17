@@ -8,6 +8,7 @@ import {
   Grid,
   List,
   Users,
+  User,
   CreditCard,
   Briefcase,
   ShoppingBag,
@@ -38,20 +39,35 @@ const categoryFilters: {
   { value: "other", label: "Other", icon: Folder },
 ];
 
+/**
+ * Vault Component
+ * 
+ * This is the main dashboard of the application where users can view, search, 
+ * filter, and manage their stored credentials. It includes functionality for 
+ * importing credentials from CSV files and toggling between grid and list views.
+ */
 export function Vault() {
-  const { credentials, lock, addCredential } = useVault();
+  const { credentials, lock, addCredential, setShowDashboard, user } = useVault();
+  // State for the search query input
   const [search, setSearch] = useState("");
+  
+  // State for currently active category filters, defaults to all categories selected
   const [selectedCategories, setSelectedCategories] = useState<Category[]>(
     categoryFilters.filter(f => f.value !== "all").map(f => f.value as Category)
   );
+  
+  // UI states for dropdowns and view modes
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  
+  // Tracks which credential is being edited; null if adding a new one
   const [editingCredential, setEditingCredential] = useState<Credential | null>(
     null,
   );
 
+  // Closes the category filter dropdown when clicking outside of it
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -66,10 +82,21 @@ export function Vault() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  /**
+   * Triggers the hidden file input click event to open the file picker
+   */
   const handleImportClick = () => {
     fileInputRef.current?.click();
   };
 
+  /**
+   * Parses a single row of a CSV file, handling quoted values that might contain commas.
+   * 
+   * Complex Logic:
+   * It iterates through characters to identify delimiters (commas) while respecting
+   * content inside double quotes. If it finds a double quote inside a quoted section,
+   * it handles it as an escaped quote.
+   */
   const parseCSVRow = (rowText: string): string[] => {
     const result: string[] = [];
     let current = "";
@@ -94,6 +121,15 @@ export function Vault() {
     return result;
   };
 
+  /**
+   * Processes the selected CSV file for importing credentials.
+   * 
+   * Complex Logic:
+   * 1. Reads the file as text.
+   * 2. Splits by newlines and identifies header indices (name, url, username, etc.).
+   * 3. Iterates through data rows, mapping CSV columns to Credential fields.
+   * 4. Automatically adds each valid row to the vault via `addCredential`.
+   */
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -139,6 +175,10 @@ export function Vault() {
     e.target.value = "";
   };
 
+  /**
+   * Filters the list of credentials based on search terms and selected categories.
+   * Optimized with useMemo to only recalculate when dependencies change.
+   */
   const filteredCredentials = useMemo(() => {
     return credentials.filter((cred) => {
       const matchesSearch =
@@ -152,6 +192,9 @@ export function Vault() {
     });
   }, [credentials, search, selectedCategories]);
 
+  /**
+   * Calculates statistics for the vault, such as total count and per-category breakdown.
+   */
   const stats = useMemo(() => {
     const byCategory = credentials.reduce(
       (acc, cred) => {
@@ -192,14 +235,25 @@ export function Vault() {
                 </div>
               </div>
 
-              {/* Lock button */}
-              <button
-                onClick={lock}
-                className="flex items-center gap-2 rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
-              >
-                <Lock className="h-4 w-4" />
-                Lock Vault
-              </button>
+              {/* User Menu & Lock */}
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowDashboard(true)}
+                  className="flex items-center gap-2 rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
+                >
+                  <User className="h-4 w-4 text-cyan-400" />
+                  <span>{user?.username}'s Settings</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={lock}
+                  className="flex items-center gap-2 rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
+                >
+                  <Lock className="h-4 w-4" />
+                  Lock Vault
+                </button>
+              </div>
             </div>
           </div>
         </header>
