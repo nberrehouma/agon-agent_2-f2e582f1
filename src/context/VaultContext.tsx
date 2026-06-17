@@ -25,6 +25,8 @@ interface VaultContextType extends VaultState {
   isLoading: boolean;
   showDashboard: boolean;
   setShowDashboard: (show: boolean) => void;
+  showLanding: boolean;
+  setShowLanding: (show: boolean) => void;
 }
 
 const VaultContext = createContext<VaultContextType | null>(null);
@@ -37,6 +39,7 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(localStorage.getItem('vault_token'));
   const [showDashboard, setShowDashboard] = useState(false);
+  const [showLanding, setShowLanding] = useState(true);
 
   const masterPasswordHash = hasVault ? 'stored' : null;
 
@@ -146,6 +149,7 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
     setCredentials([]);
     setHasVault(false);
     setShowDashboard(false);
+    setShowLanding(true);
   }, []);
 
   const updateProfile = useCallback(async (username?: string, currentPassword?: string, newPassword?: string): Promise<boolean> => {
@@ -350,7 +354,9 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
       updateProfile,
       changeMasterPassword,
       showDashboard,
-      setShowDashboard
+      setShowDashboard,
+      showLanding,
+      setShowLanding
     }}>
       {children}
     </VaultContext.Provider>

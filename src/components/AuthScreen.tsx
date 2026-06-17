@@ -4,7 +4,7 @@ import { Shield, Lock, User, Eye, EyeOff, LogIn, UserPlus } from 'lucide-react';
 import { useVault } from '../context/VaultContext';
 
 export function AuthScreen() {
-  const { signin, signup } = useVault();
+  const { signin, signup, setShowLanding } = useVault();
   const [isLogin, setIsLogin] = useState(true);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -240,6 +240,17 @@ export function AuthScreen() {
                 ) : (
                   <span>Already have an account? <strong className="text-cyan-500">Sign In</strong></span>
                 )}
+              </button>
+            </div>
+
+            {/* Back to Home */}
+            <div className="text-center pt-3 border-t border-slate-800/50 mt-4">
+              <button
+                type="button"
+                onClick={() => setShowLanding(true)}
+                className="text-xs text-slate-500 hover:text-slate-300 transition-colors font-semibold cursor-pointer"
+              >
+                ← Back to Home
               </button>
             </div>
           </form>
